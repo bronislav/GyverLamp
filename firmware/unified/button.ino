@@ -26,6 +26,8 @@ void buttonTick() {
     loadingFlag = true;
     settChanged = true;
     eepromTimer = millis();
+    FastLED.clear();
+    delay(1);
   }
   if (ONflag && touch.isTriple()) {
     if (--currentMode < 0) currentMode = 0;
@@ -33,6 +35,8 @@ void buttonTick() {
     loadingFlag = true;
     settChanged = true;
     eepromTimer = millis();
+    FastLED.clear();
+    delay(1);
   }
 
   if (ONflag && touch.isHolded()) {
