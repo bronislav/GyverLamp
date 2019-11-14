@@ -1,6 +1,6 @@
 boolean brightDirection;
 
-void buttonTick() {  
+void buttonTick() {
   touch.tick();
   if (touch.isSingle()) {
     if (dawnFlag) {
@@ -17,6 +17,7 @@ void buttonTick() {
         ONflag = true;
         changePower();
       }
+      sendSettings_flag = true;
     }
   }
 
@@ -28,23 +29,30 @@ void buttonTick() {
     eepromTimer = millis();
     FastLED.clear();
     delay(1);
+    sendSettings_flag = true;
   }
   if (ONflag && touch.isTriple()) {
-    if (--currentMode < 0) currentMode = MODE_AMOUNT;
+    if (--currentMode < 0) currentMode = MODE_AMOUNT - 1;
     FastLED.setBrightness(modes[currentMode].brightness);
     loadingFlag = true;
     settChanged = true;
     eepromTimer = millis();
     FastLED.clear();
     delay(1);
+    sendSettings_flag = true;
   }
 
   // вывод IP на лампу
   if (ONflag && touch.hasClicks()) {
     if (touch.getClicks() == 5) {
-      while(!fillString(lampIP)) delay(1);
+      resetString();
+      while (!fillString(lampIP, CRGB::Green, true)) {
+        delay(1);
+        ESP.wdtFeed();   // пнуть собаку
+        yield();  // ещё раз пнуть собаку
+      }
     }
-  }  
+  }
 
   if (ONflag && touch.isHolded()) {
     brightDirection = !brightDirection;
@@ -62,5 +70,6 @@ void buttonTick() {
     FastLED.setBrightness(modes[currentMode].brightness);
     settChanged = true;
     eepromTimer = millis();
+    sendSettings_flag = true;
   }
 }

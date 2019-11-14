@@ -1,4 +1,6 @@
 byte minuteCounter = 0;
+CHSV dawnColor;
+
 void timeTick() {
   if (ESP_MODE == 1) {
     if (timeTimer.isReady()) {  // каждую секунду
@@ -16,6 +18,10 @@ void timeTick() {
           days++;
           if (days > 6) days = 0;
         }
+        timeStr = String(hrs);
+        timeStr += ":";
+        timeStr += (mins < 10) ? "0" : "";
+        timeStr += String(mins);
       }
 
       if (minuteCounter > 30 && WiFi.status() == WL_CONNECTED) {    // синхронизация каждые 30 минут
@@ -31,6 +37,11 @@ void timeTick() {
       if (secs % 3 == 0) checkDawn();   // каждые 3 секунды проверяем рассвет
     }
   }
+  if (dawnFlag && timeStrTimer.isReady()) {
+    fill_solid(leds, NUM_LEDS, dawnColor);
+    fillString(timeStr, CRGB::Black, false);
+    FastLED.show();
+  }
 }
 
 void checkDawn() {
@@ -42,17 +53,15 @@ void checkDawn() {
   // проверка рассвета
   if (alarm[thisDay].state &&                                       // день будильника
       thisTime >= (alarm[thisDay].time - dawnOffsets[dawnMode]) &&  // позже начала
-      thisTime < (alarm[thisDay].time + DAWN_TIMEOUT) ) {                      // раньше конца + минута
+      thisTime < (alarm[thisDay].time + DAWN_TIMEOUT) ) {           // раньше конца + минута
     if (!manualOff) {
       // величина рассвета 0-255
       int dawnPosition = 255 * ((float)(thisTime - (alarm[thisDay].time - dawnOffsets[dawnMode])) / dawnOffsets[dawnMode]);
       dawnPosition = constrain(dawnPosition, 0, 255);
-      CHSV dawnColor = CHSV(map(dawnPosition, 0, 255, 10, 35),
+      dawnColor = CHSV(map(dawnPosition, 0, 255, 10, 35),
                             map(dawnPosition, 0, 255, 255, 170),
-                            map(dawnPosition, 0, 255, 10, DAWN_BRIGHT));
-      fill_solid(leds, NUM_LEDS, dawnColor);
+                            map(dawnPosition, 0, 255, 10, DAWN_BRIGHT));      
       FastLED.setBrightness(255);
-      FastLED.show();
       dawnFlag = true;
     }
   } else {

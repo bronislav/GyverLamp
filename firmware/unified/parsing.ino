@@ -6,7 +6,9 @@ void parseUDP() {
     inputBuffer = packetBuffer;
 
     if (inputBuffer.startsWith("DEB")) {
-      inputBuffer = "OK " + timeClient.getFormattedTime();
+      if (sendSettings_flag) sendCurrent();
+      else inputBuffer = "OK " + timeClient.getFormattedTime();
+      sendSettings_flag = false;
     } else if (inputBuffer.startsWith("GET")) {
       sendCurrent();
     } else if (inputBuffer.startsWith("EFF")) {
@@ -59,6 +61,7 @@ void parseUDP() {
                       ":" + String(minute);
       }
       saveAlarm(alarmNum);
+      manualOff = false;
     } else if (inputBuffer.startsWith("ALM_GET")) {
       sendAlarms();
     } else if (inputBuffer.startsWith("DAWN")) {
@@ -86,6 +89,15 @@ void sendCurrent() {
   inputBuffer += String(modes[currentMode].scale);
   inputBuffer += " ";
   inputBuffer += String(ONflag);
+}
+
+void sendSettings() {
+  sendCurrent();
+  char reply[inputBuffer.length() + 1];
+  inputBuffer.toCharArray(reply, inputBuffer.length() + 1);
+  Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+  Udp.write(reply);
+  Udp.endPacket();
 }
 
 void sendAlarms() {

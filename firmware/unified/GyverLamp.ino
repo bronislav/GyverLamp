@@ -11,6 +11,15 @@
   Версия 1.5.1
   - Оптимизировано обращение к серверу времени (нет подвисаний при отсутствии интернета)
   - Оптимизация под пины NodeMCU
+
+  Версия 1.5.2
+  - Исправлен незначительный баг с таймером
+  - Исправлено падение по WDT при выводе IP
+  - Исправлен баг с переназначением времени будильника
+  - Исправлено переключение с первого на последний режимы
+  - Приложение автоматически получает настройки с кнопки
+  - Бегущая строка с текущим временем во время рассвета
+
 */
 
 // Ссылка для менеджера плат:
@@ -93,6 +102,7 @@ WiFiUDP Udp;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTP_ADDRESS, GMT * 3600, NTP_INTERVAL);
 timerMinim timeTimer(1000);
+timerMinim timeStrTimer(120);
 GButton touch(BTN_PIN, LOW_PULL, NORM_OPEN);
 
 // ----------------- ПЕРЕМЕННЫЕ ------------------
@@ -115,11 +125,12 @@ struct {
   int time = 0;
 } alarm[7];
 
-byte dawnOffsets[] = {5, 10, 15, 20, 25, 30, 40, 50, 60};
+const byte dawnOffsets[] = {5, 10, 15, 20, 25, 30, 40, 50, 60};
 byte dawnMode;
 boolean dawnFlag = false;
 long thisTime;
 boolean manualOff = false;
+boolean sendSettings_flag = false;
 
 int8_t currentMode = 0;
 boolean loadingFlag = true;
@@ -134,6 +145,7 @@ unsigned char matrixValue[8][16];
 String lampIP = "";
 byte hrs, mins, secs;
 byte days;
+String timeStr = "00:00";
 
 void setup() {
   ESP.wdtDisable();
@@ -216,12 +228,7 @@ void setup() {
   currentMode = (int8_t)EEPROM.read(200);
 
   // отправляем настройки
-  sendCurrent();
-  char reply[inputBuffer.length() + 1];
-  inputBuffer.toCharArray(reply, inputBuffer.length() + 1);
-  Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
-  Udp.write(reply);
-  Udp.endPacket();
+  sendSettings();
 
   timeClient.begin();
   memset(matrixValue, 0, sizeof(matrixValue));
@@ -241,6 +248,10 @@ void setup() {
     count++;
     delay(500);
   }
+  timeStr = String(hrs);
+  timeStr += ":";
+  timeStr += (mins < 10) ? "0" : "";
+  timeStr += String(mins);
 }
 
 void loop() {
