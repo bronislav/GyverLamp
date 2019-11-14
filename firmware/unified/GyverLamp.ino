@@ -8,16 +8,16 @@
 */
 
 /*
-  Версия 1.5:
-  - Исправлено непереключение кнопкой с первого на последний режимы
-  - Добавлена настройка для отключения кнопки (для корректной работы схемы без кнопки)
-  - Убран статический IP для локального режима (вызывал проблемы)
-  - Добавлена возможность сброса настроек WiFi удержанием кнопки при включении лампы (~7 секунд)
-  - Добавлен вывод IP адреса на лампу по пятикратному нажатию на кнопку
+  Версия 1.5.1
+  - Оптимизировано обращение к серверу времени (нет подвисаний при отсутствии интернета)
+  - Оптимизация под пины NodeMCU
 */
 
 // Ссылка для менеджера плат:
 // http://arduino.esp8266.com/stable/package_esp8266com_index.json
+
+// Для WEMOS выбираем плату LOLIN(WEMOS) D1 R2 & mini
+// Для NodeMCU выбираем NodeMCU 1.0 (ESP-12E Module)
 
 // ============= НАСТРОЙКИ =============
 // -------- КНОПКА -------
@@ -62,8 +62,8 @@ byte IP_AP[] = {192, 168, 4, 66};   // статический IP точки до
 #define AC_PASS "12345678"
 
 // ============= ДЛЯ РАЗРАБОТЧИКОВ =============
-#define LED_PIN 2             // пин ленты
-#define BTN_PIN 4
+#define LED_PIN D4             // пин ленты
+#define BTN_PIN D2
 #define MODE_AMOUNT 18
 
 #define NUM_LEDS WIDTH * HEIGHT
@@ -74,7 +74,7 @@ byte IP_AP[] = {192, 168, 4, 66};   // статический IP точки до
 #define FASTLED_ESP8266_RAW_PIN_ORDER
 #define NTP_INTERVAL 60 * 1000    // обновление (1 минута)
 
-#include "timerMinim.h"
+#include "timer2Minim.h"
 #include <FastLED.h>
 #include <ESP8266WiFi.h>
 #include <DNSServer.h>
@@ -92,7 +92,7 @@ WiFiServer server(80);
 WiFiUDP Udp;
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, NTP_ADDRESS, GMT * 3600, NTP_INTERVAL);
-timerMinim timeTimer(3000);
+timerMinim timeTimer(1000);
 GButton touch(BTN_PIN, LOW_PULL, NORM_OPEN);
 
 // ----------------- ПЕРЕМЕННЫЕ ------------------
@@ -132,6 +132,8 @@ boolean settChanged = false;
 
 unsigned char matrixValue[8][16];
 String lampIP = "";
+byte hrs, mins, secs;
+byte days;
 
 void setup() {
   ESP.wdtDisable();
@@ -142,13 +144,12 @@ void setup() {
   FastLED.setBrightness(BRIGHTNESS);
   if (CURRENT_LIMIT > 0) FastLED.setMaxPowerInVoltsAndMilliamps(5, CURRENT_LIMIT);
   FastLED.show();
-  
+
   touch.setStepTimeout(100);
   touch.setClickTimeout(500);
 
   Serial.begin(115200);
   Serial.println();
-
   delay(1000);
 
   // WI-FI
@@ -226,6 +227,20 @@ void setup() {
   memset(matrixValue, 0, sizeof(matrixValue));
 
   randomSeed(micros());
+
+  // получаем время
+  byte count = 0;
+  while (count < 5) {
+    if (timeClient.update()) {
+      hrs = timeClient.getHours();
+      mins = timeClient.getMinutes();
+      secs = timeClient.getSeconds();
+      days = timeClient.getDay();
+      break;
+    }
+    count++;
+    delay(500);
+  }
 }
 
 void loop() {
