@@ -56,6 +56,7 @@ void changePower() {
       FastLED.show();
     }
     FastLED.setBrightness(modes[currentMode].brightness);
+    delay(2);
     FastLED.show();
   } else {
     effectsTick();
@@ -65,6 +66,7 @@ void changePower() {
       FastLED.show();
     }
     FastLED.clear();
+    delay(2);
     FastLED.show();
   }
 }
