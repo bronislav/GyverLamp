@@ -2,7 +2,7 @@ uint32_t effTimer;
 
 void effectsTick() {
   if (!dawnFlag) {
-    if (ONflag && millis() - effTimer >= ((currentMode < 5) ? modes[currentMode].speed : 50) ) {
+    if (ONflag && millis() - effTimer >= ((currentMode < 5 || currentMode > 13) ? modes[currentMode].speed : 50) ) {
       effTimer = millis();
       switch (currentMode) {
         case 0: sparklesRoutine();
@@ -32,6 +32,14 @@ void effectsTick() {
         case 12: forestNoise();
           break;
         case 13: oceanNoise();
+          break;
+        case 14: colorRoutine();
+          break;
+        case 15: snowRoutine();
+          break;
+        case 16: matrixRoutine();
+          break;
+        case 17: lightersRoutine();
           break;
       }
       FastLED.show();

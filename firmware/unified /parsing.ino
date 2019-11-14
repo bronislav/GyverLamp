@@ -13,6 +13,7 @@ void parseUDP() {
       saveEEPROM();
       currentMode = (byte)inputBuffer.substring(3).toInt();
       loadingFlag = true;
+      FastLED.clear();
       sendCurrent();
       FastLED.setBrightness(modes[currentMode].brightness);
     } else if (inputBuffer.startsWith("BRI")) {

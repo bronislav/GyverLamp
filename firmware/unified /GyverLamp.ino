@@ -7,6 +7,15 @@
   https://AlexGyver.ru/
 */
 
+/*
+  Версия 1.2:
+  - Добавлена настройка статического IP
+  - Добавлен эффект "Цвет"
+  - Добавлен эффект "Снег"
+  - Добавлен эффект "Матрица"
+  - Добавлен эффект "Светлячки"
+*/
+
 // Ссылка для менеджера плат:
 // http://arduino.esp8266.com/stable/package_esp8266com_index.json
 
@@ -31,27 +40,29 @@
 #define MATRIX_TYPE 0         // тип матрицы: 0 - зигзаг, 1 - параллельная
 #define CONNECTION_ANGLE 0    // угол подключения: 0 - левый нижний, 1 - левый верхний, 2 - правый верхний, 3 - правый нижний
 #define STRIP_DIRECTION 0     // направление ленты из угла: 0 - вправо, 1 - вверх, 2 - влево, 3 - вниз
-// при неправильной настрйоке матрицы вы получите предупреждение "Wrong matrix parameters! Set to default"
+// при неправильной настройке матрицы вы получите предупреждение "Wrong matrix parameters! Set to default"
 // шпаргалка по настройке матрицы здесь! https://alexgyver.ru/matrix_guide/
 
 // --------- ESP --------
 #define ESP_MODE 1
-// 0 - точка доступа (192.168.4.1 или другой)
-// 1 - локальный (192.168.1.232 или другой)
+// 0 - точка доступа
+// 1 - локальный
+byte IP_AP[] = {192, 168, 4, 66};   // статический IP точки доступа (менять только последнюю цифру)
+byte IP_STA[] = {192, 168, 1, 66};  // статический IP локальный (менять только последнюю цифру)
+
+// ----- AP (точка доступа) -------
+#define AP_SSID "GyverLamp"
+#define AP_PASS "12345678"
+#define AP_PORT 8888
 
 // -------- Менеджер WiFi ---------
 #define AC_SSID "AutoConnectAP"
 #define AC_PASS "12345678"
 
-// -------------- AP ---------------
-#define AP_SSID "GyverLamp"
-#define AP_PASS "12345678"
-#define AP_PORT 8888
-
 // ============= ДЛЯ РАЗРАБОТЧИКОВ =============
 #define LED_PIN 2             // пин ленты
 #define BTN_PIN 4
-#define MODE_AMOUNT 14
+#define MODE_AMOUNT 18
 
 #define NUM_LEDS WIDTH * HEIGHT
 #define SEGMENTS 1            // диодов в одном "пикселе" (для создания матрицы из кусков ленты)
@@ -94,7 +105,7 @@ struct {
   byte brightness = 50;
   byte speed = 30;
   byte scale = 40;
-} modes[15];
+} modes[MODE_AMOUNT];
 
 struct {
   boolean state = false;
@@ -121,35 +132,43 @@ unsigned char matrixValue[8][16];
 void setup() {
   ESP.wdtDisable();
   //ESP.wdtEnable(WDTO_8S);
-  delay(1000);
+
   // ЛЕНТА
   FastLED.addLeds<WS2812B, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)/*.setCorrection( TypicalLEDStrip )*/;
   FastLED.setBrightness(BRIGHTNESS);
   if (CURRENT_LIMIT > 0) FastLED.setMaxPowerInVoltsAndMilliamps(5, CURRENT_LIMIT);
   FastLED.clear();
   FastLED.show();
-  randomSeed(analogRead(0));    // пинаем генератор случайных чисел
+
   touch.setStepTimeout(100);
   touch.setClickTimeout(500);
 
   Serial.begin(115200);
+  Serial.println();
 
   // WI-FI
   if (ESP_MODE == 0) {    // режим точки доступа
-    boolean conn = WiFi.softAP(AP_NameChar, WiFiPassword);
-    server.begin();
+    WiFi.softAPConfig(IPAddress(IP_AP[0], IP_AP[1], IP_AP[2], IP_AP[3]),
+                      IPAddress(192, 168, 4, 1),
+                      IPAddress(255, 255, 255, 0));
 
+    WiFi.softAP(AP_NameChar, WiFiPassword);
     IPAddress myIP = WiFi.softAPIP();
-    Serial.println(conn);
     Serial.print("Access point Mode");
     Serial.print("AP IP address: ");
     Serial.println(myIP);
+
+    server.begin();
   } else {                // подключаемся к роутеру
     Serial.print("WiFi manager");
     WiFiManager wifiManager;
+    wifiManager.setDebugOutput(false);
     //wifiManager.resetSettings();
-    //wifiManager.setAPStaticIPConfig(IPAddress(10,0,1,1), IPAddress(10,0,1,1), IPAddress(255,255,255,0));
+
     wifiManager.autoConnect(autoConnectSSID, autoConnectPass);
+    WiFi.config(IPAddress(IP_STA[0], IP_STA[1], IP_STA[2], IP_STA[3]),
+                IPAddress(192, 168, 1, 1),
+                IPAddress(255, 255, 255, 0));
     Serial.print("Connected! IP address: ");
     Serial.println(WiFi.localIP());
   }
@@ -157,34 +176,34 @@ void setup() {
   Udp.begin(localPort);
 
   // EEPROM
-  EEPROM.begin(128);
+  EEPROM.begin(202);
   delay(50);
-  if (EEPROM.read(102) != 20) {   // первый запуск
-    EEPROM.write(102, 20);
+  if (EEPROM.read(198) != 20) {   // первый запуск
+    EEPROM.write(198, 20);
     EEPROM.commit();
 
     for (byte i = 0; i < MODE_AMOUNT; i++) {
-      EEPROM.put(3 * i, modes[i]);
+      EEPROM.put(3 * i + 40, modes[i]);
       EEPROM.commit();
     }
     for (byte i = 0; i < 7; i++) {
-      EEPROM.write(5 * i + 50, alarm[i].state);   // рассвет
-      eeWriteInt(5 * i + 50 + 1, alarm[i].time);
+      EEPROM.write(5 * i, alarm[i].state);   // рассвет
+      eeWriteInt(5 * i + 1, alarm[i].time);
       EEPROM.commit();
     }
-    EEPROM.write(100, 0);   // рассвет
-    EEPROM.write(101, 0);   // режим
+    EEPROM.write(199, 0);   // рассвет
+    EEPROM.write(200, 0);   // режим
     EEPROM.commit();
   }
   for (byte i = 0; i < MODE_AMOUNT; i++) {
-    EEPROM.get(3 * i, modes[i]);
+    EEPROM.get(3 * i + 40, modes[i]);
   }
   for (byte i = 0; i < 7; i++) {
-    alarm[i].state = EEPROM.read(5 * i + 50);
-    alarm[i].time = eeGetInt(5 * i + 50 + 1);
+    alarm[i].state = EEPROM.read(5 * i);
+    alarm[i].time = eeGetInt(5 * i + 1);
   }
-  dawnMode = EEPROM.read(100);
-  currentMode = (int8_t)EEPROM.read(101);
+  dawnMode = EEPROM.read(199);
+  currentMode = (int8_t)EEPROM.read(200);
 
   // отправляем настройки
   sendCurrent();
@@ -196,6 +215,8 @@ void setup() {
 
   timeClient.begin();
   memset(matrixValue, 0, sizeof(matrixValue));
+
+  randomSeed(micros());
 }
 
 void loop() {
@@ -205,6 +226,7 @@ void loop() {
   timeTick();
   buttonTick();
   ESP.wdtFeed();   // пнуть собаку
+  yield();
 }
 
 void eeWriteInt(int pos, int val) {
