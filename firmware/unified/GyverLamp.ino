@@ -8,15 +8,21 @@
 */
 
 /*
-  Версия 1.4:
-  - Исправлен баг при смене режимов
-  - Исправлены тормоза в режиме точки доступа
+  Версия 1.5:
+  - Исправлено непереключение кнопкой с первого на последний режимы
+  - Добавлена настройка для отключения кнопки (для корректной работы схемы без кнопки)
+  - Убран статический IP для локального режима (вызывал проблемы)
+  - Добавлена возможность сброса настроек WiFi удержанием кнопки при включении лампы (~7 секунд)
+  - Добавлен вывод IP адреса на лампу по пятикратному нажатию на кнопку
 */
 
 // Ссылка для менеджера плат:
 // http://arduino.esp8266.com/stable/package_esp8266com_index.json
 
 // ============= НАСТРОЙКИ =============
+// -------- КНОПКА -------
+#define USE_BUTTON 1    // 1 - использовать кнопку, 0 - нет
+
 // -------- ВРЕМЯ -------
 #define GMT 3              // смещение (москва 3)
 #define NTP_ADDRESS  "europe.pool.ntp.org"    // сервер времени
@@ -45,7 +51,6 @@
 // 0 - точка доступа
 // 1 - локальный
 byte IP_AP[] = {192, 168, 4, 66};   // статический IP точки доступа (менять только последнюю цифру)
-byte IP_STA[] = {192, 168, 1, 66};  // статический IP локальный (менять только последнюю цифру)
 
 // ----- AP (точка доступа) -------
 #define AP_SSID "GyverLamp"
@@ -79,6 +84,7 @@ byte IP_STA[] = {192, 168, 1, 66};  // статический IP локальн�
 #include <EEPROM.h>
 #include <NTPClient.h>
 #include <GyverButton.h>
+#include "fonts.h"
 
 // ------------------- ТИПЫ --------------------
 CRGB leds[NUM_LEDS];
@@ -125,6 +131,7 @@ boolean settChanged = false;
 // Павлин 3D, Зебра 3D, Лес 3D, Океан 3D,
 
 unsigned char matrixValue[8][16];
+String lampIP = "";
 
 void setup() {
   ESP.wdtDisable();
@@ -134,14 +141,15 @@ void setup() {
   FastLED.addLeds<WS2812B, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS)/*.setCorrection( TypicalLEDStrip )*/;
   FastLED.setBrightness(BRIGHTNESS);
   if (CURRENT_LIMIT > 0) FastLED.setMaxPowerInVoltsAndMilliamps(5, CURRENT_LIMIT);
-  FastLED.clear();
   FastLED.show();
-
+  
   touch.setStepTimeout(100);
   touch.setClickTimeout(500);
 
   Serial.begin(115200);
   Serial.println();
+
+  delay(1000);
 
   // WI-FI
   if (ESP_MODE == 0) {    // режим точки доступа
@@ -160,14 +168,18 @@ void setup() {
     Serial.print("WiFi manager");
     WiFiManager wifiManager;
     wifiManager.setDebugOutput(false);
-    //wifiManager.resetSettings();
+
+#if (USE_BUTTON == 1)
+    if (digitalRead(BTN_PIN)) wifiManager.resetSettings();
+#endif
 
     wifiManager.autoConnect(autoConnectSSID, autoConnectPass);
-    WiFi.config(IPAddress(IP_STA[0], IP_STA[1], IP_STA[2], IP_STA[3]),
+    /*WiFi.config(IPAddress(IP_STA[0], IP_STA[1], IP_STA[2], IP_STA[3]),
                 IPAddress(192, 168, 1, 1),
-                IPAddress(255, 255, 255, 0));
+                IPAddress(255, 255, 255, 0));*/
     Serial.print("Connected! IP address: ");
     Serial.println(WiFi.localIP());
+    lampIP = WiFi.localIP().toString();
   }
   Serial.printf("UDP server on port %d\n", localPort);
   Udp.begin(localPort);
@@ -221,9 +233,11 @@ void loop() {
   effectsTick();
   eepromTick();
   timeTick();
+#if (USE_BUTTON == 1)
   buttonTick();
+#endif
   ESP.wdtFeed();   // пнуть собаку
-  yield();
+  yield();  // ещё раз пнуть собаку
 }
 
 void eeWriteInt(int pos, int val) {
