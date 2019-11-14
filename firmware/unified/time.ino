@@ -38,6 +38,9 @@ void timeTick() {
   if (dawnFlag && timeStrTimer.isReady()) {
     fill_solid(leds, NUM_LEDS, dawnColor);
     fillString(timeStr, CRGB::Black, false);
+    delay(1);
+    ESP.wdtFeed();   // пнуть собаку
+    yield();  // ещё раз пнуть собаку
     FastLED.show();
   }
 }
@@ -74,6 +77,8 @@ void checkDawn() {
       dawnFlag = false;
       manualOff = false;
       FastLED.setBrightness(modes[currentMode].brightness);
+      FastLED.clear();
+      FastLED.show();
     }
   }
 }
