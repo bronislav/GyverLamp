@@ -20,6 +20,10 @@
   - Приложение автоматически получает настройки с кнопки
   - Бегущая строка с текущим временем во время рассвета
 
+  Версия 1.5.3
+  - Увеличена плавность рассвета
+  - Поправлен баг с отображением времени рассвета
+
 */
 
 // Ссылка для менеджера плат:
@@ -128,7 +132,7 @@ struct {
 const byte dawnOffsets[] = {5, 10, 15, 20, 25, 30, 40, 50, 60};
 byte dawnMode;
 boolean dawnFlag = false;
-long thisTime;
+float thisTime;
 boolean manualOff = false;
 boolean sendSettings_flag = false;
 
@@ -248,10 +252,7 @@ void setup() {
     count++;
     delay(500);
   }
-  timeStr = String(hrs);
-  timeStr += ":";
-  timeStr += (mins < 10) ? "0" : "";
-  timeStr += String(mins);
+  updTime();
 }
 
 void loop() {
